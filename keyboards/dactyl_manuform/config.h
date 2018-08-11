@@ -33,10 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Rows are doubled-up
 #define MATRIX_ROWS 10
 #define MATRIX_COLS 5
+#define ROWS_PER_HAND (MATRIX_ROWS / 2)
 
 // wiring of each half
 #define MATRIX_ROW_PINS { PAL_LINE(GPIOB, 13), PAL_LINE(GPIOB, 14), PAL_LINE(GPIOB, 15), PAL_LINE(GPIOA, 8), PAL_LINE(GPIOA, 9) }
-#define MATRIX_COL_PINS { PAL_LINE(GPIOB, 5), PAL_LINE(GPIOB, 6), PAL_LINE(GPIOB, 7), PAL_LINE(GPIOB, 8), PAL_LINE(GPIOB, 9) }
+#define MATRIX_COL_PINS { PAL_LINE(GPIOB, 9), PAL_LINE(GPIOB, 8), PAL_LINE(GPIOB, 7), PAL_LINE(GPIOB, 6), PAL_LINE(GPIOB, 5) }
+
+#define USE_I2C
+#define I2C_DEVICE I2CD2
+#define SLAVE_I2C_ADDRESS 0x32
 
 /* define if matrix has ghost */
 //#define MATRIX_HAS_GHOST

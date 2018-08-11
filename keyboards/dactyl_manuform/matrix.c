@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "print.h"
 #include "util.h"
 #include "wait.h"
+#include "split_util.h"
+#include "i2c.h"
 
 #ifndef DEBOUNCE
 #define DEBOUNCE 5
@@ -35,10 +37,13 @@ static uint8_t debouncing = DEBOUNCE;
 
 /* matrix state(1:on, 0:off) */
 static matrix_row_t matrix[MATRIX_ROWS];
-static matrix_row_t matrix_debouncing[MATRIX_ROWS];
+static matrix_row_t matrix_debouncing[ROWS_PER_HAND];
 
-static const ioline_t row_pins[MATRIX_ROWS] = MATRIX_ROW_PINS;
-static const ioline_t col_pins[MATRIX_COLS] = MATRIX_COL_PINS;
+static const ioline_t row_pins[ROWS_PER_HAND] = MATRIX_ROW_PINS;
+static const ioline_t col_pins[MATRIX_COLS]   = MATRIX_COL_PINS;
+
+volatile bool isLeftHand = false;
+static int    matrix_offset;
 
 static matrix_row_t read_cols(void);
 static void         init_pins(void);
@@ -92,6 +97,8 @@ void LED_TGL(void)
 
 void matrix_init(void)
 {
+  matrix_offset = isLeftHand ? 0 : ROWS_PER_HAND;
+
   // initialize row and col
   init_pins();
   unselect_rows();
@@ -100,23 +107,24 @@ void matrix_init(void)
   for (uint8_t i = 0; i < MATRIX_ROWS; i++)
   {
     matrix[i]            = 0;
-    matrix_debouncing[i] = 0;
+    matrix_debouncing[i>>1] = 0;
   }
 
   // debug
-  debug_matrix = true;
+  debug_enable = true;
   LED_ON();
   wait_ms(500);
   LED_OFF();
 }
 
-uint8_t matrix_scan(void)
+uint8_t _matrix_scan(void)
 {
-  for (uint8_t i = 0; i < MATRIX_ROWS; i++)
+  for (uint8_t i = 0; i < ROWS_PER_HAND; i++)
   {
     select_row(i);
     wait_us(30);  // without this wait read unstable value.
     matrix_row_t cols = read_cols();
+    debug_hex(cols);
     if (matrix_debouncing[i] != cols)
     {
       matrix_debouncing[i] = cols;
@@ -139,14 +147,40 @@ uint8_t matrix_scan(void)
     }
     else
     {
-      for (uint8_t i = 0; i < MATRIX_ROWS; i++)
+      for (uint8_t i = 0; i < ROWS_PER_HAND; i++)
       {
-        matrix[i] = matrix_debouncing[i];
+        matrix[matrix_offset + i] = matrix_debouncing[i];
       }
     }
   }
 
   return 1;
+}
+
+uint8_t matrix_scan(void)
+{
+  uint8_t ret          = _matrix_scan();
+  int     slave_offset = ROWS_PER_HAND - matrix_offset;
+
+  // get matrix from other half here
+#ifdef USE_I2C
+  uint8_t dest_offset = 0;
+
+  if (i2cMasterTransmitTimeout(&I2C_DEVICE, SLAVE_I2C_ADDRESS, &dest_offset, 1, matrix + slave_offset, ROWS_PER_HAND, 100) != MSG_OK)
+  {
+    i2c_reset_state();
+  }
+#endif
+  return ret;
+}
+
+void matrix_slave_scan(void)
+{
+  _matrix_scan();
+
+#ifdef USE_I2C
+  i2c_set_slave_data(matrix+matrix_offset, ROWS_PER_HAND);
+#endif
 }
 
 inline bool matrix_is_on(uint8_t row, uint8_t col)
@@ -180,9 +214,9 @@ static void init_pins(void)
   {
     palSetLineMode(col_pins[col], PAL_MODE_INPUT_PULLUP);
   }
-  for (uint8_t row = 0; row < MATRIX_ROWS; row++)
+  for (uint8_t row = 0; row < ROWS_PER_HAND; row++)
   {
-    palSetLineMode(row_pins[row], PAL_MODE_OUTPUT_PUSHPULL);
+    palSetLineMode(row_pins[row], PAL_MODE_OUTPUT_OPENDRAIN);
   }
 }
 
@@ -203,7 +237,7 @@ static matrix_row_t read_cols(void)
  */
 static void unselect_rows(void)
 {
-  for (uint8_t row = 0; row < MATRIX_ROWS; row++)
+  for (uint8_t row = 0; row < ROWS_PER_HAND; row++)
   {
     palSetLine(row_pins[row]);
   }

@@ -1,7 +1,3 @@
-# project specific files
-SRC =	matrix.c \
-	    led.c
-
 # linker script to use
 # it should exist either in <chibios>/os/common/ports/ARMCMx/compilers/GCC/ld/
 #  or <this_dir>/ld/
@@ -57,6 +53,13 @@ MOUSEKEY_ENABLE = yes	# Mouse keys
 EXTRAKEY_ENABLE = yes	# Audio control and System control
 CONSOLE_ENABLE = yes	# Console for debug
 COMMAND_ENABLE = yes    # Commands for debug and configuration
-SLEEP_LED_ENABLE = yes  # Breathing sleep LED during USB suspend
+SLEEP_LED_ENABLE = no  # Breathing sleep LED during USB suspend
 NKRO_ENABLE = yes	    # USB Nkey Rollover
 CUSTOM_MATRIX = yes # Custom matrix file
+
+# project specific files
+SRC =	matrix.c \
+      led.c \
+      split_util.c \
+      i2c.c
+
