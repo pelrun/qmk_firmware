@@ -6,6 +6,11 @@
 #include <stdbool.h>
 #include "i2c.h"
 #include "split_flags.h"
+#include "slave.h"
+
+#if (MATRIX_COLS > 8)
+#error "Currently only supports 8 COLS"
+#endif
 
 // Limits the amount of we wait for any one i2c transaction.
 // Since were running SCL line 100kHz (=> 10μs/bit), and each transactions is
@@ -90,19 +95,19 @@ uint8_t i2c_master_write(uint8_t data) {
 }
 
 uint8_t i2c_master_write_data(void *const TXdata, uint8_t dataLen) {
-    
+
     uint8_t *data = (uint8_t *)TXdata;
     int err = 0;
-    
+
     for (int i = 0; i < dataLen; i++) {
         err = i2c_master_write(data[i]);
-        
+
         if ( err )
             return err;
     }
-    
+
     return err;
-    
+
 }
 
 // Read one byte from the i2c slave. If ack=1 the slave is acknowledged,
@@ -150,18 +155,18 @@ ISR(TWI_vect) {
         if ( slave_buffer_pos >= SLAVE_BUFFER_SIZE ) {
           ack = 0;
           slave_buffer_pos = 0;
-        }  
-        
+        }
+
         slave_has_register_set = true;
-      } else {      
+      } else {
         i2c_slave_buffer[slave_buffer_pos] = TWDR;
-        
+
         if ( slave_buffer_pos == I2C_BACKLIT_START) {
             BACKLIT_DIRTY = true;
         } else if ( slave_buffer_pos == (I2C_RGB_START+3)) {
             RGB_DIRTY = true;
         }
-        
+
         BUFFER_POS_INC();
       }
       break;
@@ -181,4 +186,103 @@ ISR(TWI_vect) {
   }
   // Reset everything, so we are ready for the next TWI interrupt
   TWCR |= (1<<TWIE) | (1<<TWINT) | (ack<<TWEA) | (1<<TWEN);
+}
+
+void master_init(void)
+{
+  i2c_master_init();
+#ifdef SSD1306OLED
+  matrix_master_OLED_init();
+#endif
+}
+
+void slave_init(void)
+{
+  i2c_slave_init(SLAVE_I2C_ADDRESS);
+}
+
+void update_master_matrix(uint8_t row, matrix_row_t value)
+{
+  i2c_slave_buffer[I2C_KEYMAP_START + row] = value;
+}
+
+// Get rows from other half over i2c
+int slave_update(void)
+{
+  int err         = 0;
+
+// write backlight info
+#ifdef BACKLIGHT_ENABLE
+  if (BACKLIT_DIRTY)
+  {
+    err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_WRITE);
+    if (err)
+      goto i2c_error;
+
+    // Backlight location
+    err = i2c_master_write(I2C_BACKLIT_START);
+    if (err)
+      goto i2c_error;
+
+    // Write backlight
+    i2c_master_write(get_backlight_level());
+
+    BACKLIT_DIRTY = false;
+  }
+#endif
+
+  err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_WRITE);
+  if (err)
+    goto i2c_error;
+
+  // start of matrix stored at I2C_KEYMAP_START
+  err = i2c_master_write(I2C_KEYMAP_START);
+  if (err)
+    goto i2c_error;
+
+  // Start read
+  err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_READ);
+  if (err)
+    goto i2c_error;
+
+  if (!err)
+  {
+    for (int i = 0; i < ROWS_PER_HAND; ++i)
+    {
+      update_slave_matrix(i, i2c_master_read((i != ROWS_PER_HAND-1) ? I2C_ACK : I2C_NACK));
+    }
+    i2c_master_stop();
+  }
+  else
+  {
+  i2c_error:  // the cable is disconnceted, or something else went wrong
+    i2c_reset_state();
+    return err;
+  }
+
+#ifdef RGBLIGHT_ENABLE
+  if (RGB_DIRTY)
+  {
+    err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_WRITE);
+    if (err)
+      goto i2c_error;
+
+    // RGB Location
+    err = i2c_master_write(I2C_RGB_START);
+    if (err)
+      goto i2c_error;
+
+    uint32_t dword = eeconfig_read_rgblight();
+
+    // Write RGB
+    err = i2c_master_write_data(&dword, 4);
+    if (err)
+      goto i2c_error;
+
+    RGB_DIRTY = false;
+    i2c_master_stop();
+  }
+#endif
+
+  return 0;
 }

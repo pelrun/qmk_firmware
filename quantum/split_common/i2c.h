@@ -1,6 +1,8 @@
 #ifndef I2C_H
 #define I2C_H
 
+#define SLAVE_I2C_ADDRESS 0x32
+
 #include <stdint.h>
 
 #ifndef F_CPU

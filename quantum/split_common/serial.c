@@ -17,7 +17,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "serial.h"
-//#include <pro_micro.h>
+#include "slave.h"
 
 #ifdef SOFT_SERIAL_PIN
 
@@ -530,6 +530,62 @@ int soft_serial_get_and_clean_status(int sstd_index) {
 #endif
 
 #endif
+
+typedef struct _Serial_s2m_buffer_t
+{
+  // TODO: if MATRIX_COLS > 8 change to uint8_t packed_matrix[] for pack/unpack
+  matrix_row_t smatrix[ROWS_PER_HAND];
+} Serial_s2m_buffer_t;
+
+volatile Serial_s2m_buffer_t serial_s2m_buffer = {};
+volatile Serial_m2s_buffer_t serial_m2s_buffer = {};
+uint8_t volatile status0                       = 0;
+
+SSTD_t transactions[] = {{(uint8_t *)&status0,
+                          sizeof(serial_m2s_buffer),
+                          (uint8_t *)&serial_m2s_buffer,
+                          sizeof(serial_s2m_buffer),
+                          (uint8_t *)&serial_s2m_buffer}};
+
+void master_init(void)
+{
+  soft_serial_initiator_init(transactions, TID_LIMIT(transactions));
+}
+
+void slave_init(void)
+{
+  soft_serial_target_init(transactions, TID_LIMIT(transactions));
+}
+
+void update_master_matrix(uint8_t row, matrix_row_t value)
+{
+  serial_s2m_buffer.smatrix[row] = value;
+}
+
+int slave_update(void)
+{
+  if (soft_serial_transaction())
+  {
+    return 1;
+  }
+
+  // TODO:  if MATRIX_COLS > 8 change to unpack()
+  for (int i = 0; i < ROWS_PER_HAND; ++i)
+  {
+    update_slave_matrix(i, serial_s2m_buffer.smatrix[i]);
+  }
+
+#if defined(RGBLIGHT_ENABLE) && defined(RGBLIGHT_SPLIT)
+  // Code to send RGB over serial goes here (not implemented yet)
+#endif
+
+#ifdef BACKLIGHT_ENABLE
+  // Write backlight level for slave to read
+  serial_m2s_buffer.backlight_level = backlight_config.enable ? backlight_config.level : 0;
+#endif
+
+  return 0;
+}
 
 // Helix serial.c history
 //   2018-1-29 fork from let's split and add PD2, modify sync_recv() (#2308, bceffdefc)

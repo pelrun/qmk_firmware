@@ -27,17 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include "timer.h"
 #include "split_flags.h"
+#include "slave.h"
 #include "quantum.h"
 
 #ifdef BACKLIGHT_ENABLE
 #   include "backlight.h"
     extern backlight_config_t backlight_config;
-#endif
-
-#if defined(USE_I2C) || defined(EH)
-#  include "i2c.h"
-#else // USE_SERIAL
-#  include "serial.h"
 #endif
 
 #ifndef DEBOUNCING_DELAY
@@ -48,19 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     static uint16_t debouncing_time;
     static bool debouncing = false;
 #endif
-
-#if defined(USE_I2C) || defined(EH)
-
-#if (MATRIX_COLS <= 8)
-#    define print_matrix_header()  print("\nr/c 01234567\n")
-#    define print_matrix_row(row)  print_bin_reverse8(matrix_get_row(row))
-#    define matrix_bitpop(i)       bitpop(matrix[i])
-#    define ROW_SHIFTER ((uint8_t)1)
-#else
-#    error "Currently only supports 8 COLS"
-#endif
-
-#else // USE_SERIAL
 
 #if (MATRIX_COLS <= 8)
 #    define print_matrix_header()  print("\nr/c 01234567\n")
@@ -79,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #    define ROW_SHIFTER  ((uint32_t)1)
 #endif
 
-#endif
 static matrix_row_t matrix_debouncing[MATRIX_ROWS];
 
 #define ERROR_DISCONNECT_COUNT 5
@@ -177,9 +158,9 @@ void matrix_init(void)
         matrix[i] = 0;
         matrix_debouncing[i] = 0;
     }
-    
+
     matrix_init_quantum();
-    
+
 }
 
 uint8_t _matrix_scan(void)
@@ -230,136 +211,11 @@ uint8_t _matrix_scan(void)
     return 1;
 }
 
-#if defined(USE_I2C) || defined(EH)
-
-// Get rows from other half over i2c
-int i2c_transaction(void) {
-    int slaveOffset = (isLeftHand) ? (ROWS_PER_HAND) : 0;
-    int err = 0;
-    
-    // write backlight info
-    #ifdef BACKLIGHT_ENABLE
-        if (BACKLIT_DIRTY) {
-            err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_WRITE);
-            if (err) goto i2c_error;
-            
-            // Backlight location
-            err = i2c_master_write(I2C_BACKLIT_START);
-            if (err) goto i2c_error;
-            
-            // Write backlight 
-            i2c_master_write(get_backlight_level());
-            
-            BACKLIT_DIRTY = false;
-        }
-    #endif
-
-    err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_WRITE);
-    if (err) goto i2c_error;
-
-    // start of matrix stored at I2C_KEYMAP_START
-    err = i2c_master_write(I2C_KEYMAP_START);
-    if (err) goto i2c_error;
-
-    // Start read
-    err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_READ);
-    if (err) goto i2c_error;
-
-    if (!err) {
-        int i;
-        for (i = 0; i < ROWS_PER_HAND-1; ++i) {
-            matrix[slaveOffset+i] = i2c_master_read(I2C_ACK);
-        }
-        matrix[slaveOffset+i] = i2c_master_read(I2C_NACK);
-        i2c_master_stop();
-    } else {
-i2c_error: // the cable is disconnceted, or something else went wrong
-        i2c_reset_state();
-        return err;
-    }
-    
-    #ifdef RGBLIGHT_ENABLE
-        if (RGB_DIRTY) {
-            err = i2c_master_start(SLAVE_I2C_ADDRESS + I2C_WRITE);
-            if (err) goto i2c_error;
-            
-            // RGB Location
-            err = i2c_master_write(I2C_RGB_START);
-            if (err) goto i2c_error;
-            
-            uint32_t dword = eeconfig_read_rgblight();
-            
-            // Write RGB
-            err = i2c_master_write_data(&dword, 4);
-            if (err) goto i2c_error;
-            
-            RGB_DIRTY = false;
-            i2c_master_stop();
-        }
-    #endif
-
-    return 0;
-}
-
-#else // USE_SERIAL
-
-
-typedef struct _Serial_s2m_buffer_t {
-    // TODO: if MATRIX_COLS > 8 change to uint8_t packed_matrix[] for pack/unpack
-    matrix_row_t smatrix[ROWS_PER_HAND];
-} Serial_s2m_buffer_t;
-
-volatile Serial_s2m_buffer_t serial_s2m_buffer = {};
-volatile Serial_m2s_buffer_t serial_m2s_buffer = {};
-uint8_t volatile status0 = 0;
-
-SSTD_t transactions[] = {
-    { (uint8_t *)&status0,
-      sizeof(serial_m2s_buffer), (uint8_t *)&serial_m2s_buffer,
-      sizeof(serial_s2m_buffer), (uint8_t *)&serial_s2m_buffer
-  }
-};
-
-void serial_master_init(void)
-{ soft_serial_initiator_init(transactions, TID_LIMIT(transactions)); }
-
-void serial_slave_init(void)
-{ soft_serial_target_init(transactions, TID_LIMIT(transactions)); }
-
-int serial_transaction(void) {
-    int slaveOffset = (isLeftHand) ? (ROWS_PER_HAND) : 0;
-
-    if (soft_serial_transaction()) {
-        return 1;
-    }
-
-    // TODO:  if MATRIX_COLS > 8 change to unpack()
-    for (int i = 0; i < ROWS_PER_HAND; ++i) {
-        matrix[slaveOffset+i] = serial_s2m_buffer.smatrix[i];
-    }
-    
-    #if defined(RGBLIGHT_ENABLE) && defined(RGBLIGHT_SPLIT)
-        // Code to send RGB over serial goes here (not implemented yet)
-    #endif
-    
-    #ifdef BACKLIGHT_ENABLE
-        // Write backlight level for slave to read
-        serial_m2s_buffer.backlight_level = backlight_config.enable ? backlight_config.level : 0;
-    #endif
-
-    return 0;
-}
-#endif
-
 uint8_t matrix_scan(void)
 {
     uint8_t ret = _matrix_scan();
 
-#if defined(USE_I2C) || defined(EH)
-    if( i2c_transaction() ) {
-#else // USE_SERIAL
-    if( serial_transaction() ) {
-#endif
+    if( slave_update() ) {
 
         error_count++;
 
@@ -377,21 +233,21 @@ uint8_t matrix_scan(void)
     return ret;
 }
 
+void update_slave_matrix(uint8_t row, matrix_row_t value)
+{
+  int slaveOffset = (isLeftHand) ? (ROWS_PER_HAND) : 0;
+  matrix[slaveOffset + row] = value;
+}
+
 void matrix_slave_scan(void) {
     _matrix_scan();
 
     int offset = (isLeftHand) ? 0 : ROWS_PER_HAND;
 
-#if defined(USE_I2C) || defined(EH)
     for (int i = 0; i < ROWS_PER_HAND; ++i) {
-        i2c_slave_buffer[I2C_KEYMAP_START+i] = matrix[offset+i];
-    }   
-#else // USE_SERIAL
-    // TODO: if MATRIX_COLS > 8 change to pack()
-    for (int i = 0; i < ROWS_PER_HAND; ++i) {
-        serial_s2m_buffer.smatrix[i] = matrix[offset+i];
+      update_master_matrix(i, matrix[offset + i]);
     }
-#endif
+
     matrix_slave_scan_user();
 }
 

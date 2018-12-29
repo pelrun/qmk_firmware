@@ -37,14 +37,7 @@ static void setup_handedness(void) {
 }
 
 static void keyboard_master_setup(void) {
-#if defined(USE_I2C) || defined(EH)
-  i2c_master_init();
-  #ifdef SSD1306OLED
-    matrix_master_OLED_init ();
-  #endif
-#else
-  serial_master_init();
-#endif
+    master_init();
 
     // For master the Backlight info needs to be sent on startup
     // Otherwise the salve won't start with the proper info until an update
@@ -53,17 +46,14 @@ static void keyboard_master_setup(void) {
 
 static void keyboard_slave_setup(void) {
   timer_init();
-#if defined(USE_I2C) || defined(EH)
-    i2c_slave_init(SLAVE_I2C_ADDRESS);
-#else
-    serial_slave_init();
-#endif
+  slave_init();
 }
 
 bool has_usb(void) {
-   USBCON |= (1 << OTGPADE); //enables VBUS pad
-   _delay_us(5);
-   return (USBSTA & (1<<VBUS));  //checks state of VBUS
+  return true;
+  //  USBCON |= (1 << OTGPADE); //enables VBUS pad
+  //  _delay_us(5);
+  //  return (USBSTA & (1<<VBUS));  //checks state of VBUS
 }
 
 void split_keyboard_setup(void) {
@@ -74,7 +64,7 @@ void split_keyboard_setup(void) {
    } else {
       keyboard_slave_setup();
    }
-   sei();
+//   sei();
 }
 
 void keyboard_slave_loop(void) {
