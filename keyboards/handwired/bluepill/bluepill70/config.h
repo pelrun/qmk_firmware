@@ -20,6 +20,9 @@
 #define MATRIX_COLS 15
 #define DIODE_DIRECTION COL2ROW
 
+#define MATRIX_ROW_PINS { B8, B7, B6, B9, B5, A4 }
+#define MATRIX_COL_PINS { A5, A15, A10, A9, A8, B15, B14, B13, B12, B11, B10, B1, B0, A7, A6 }
+
 // Iso fix for Space Cadet, comment for ANSI layouts
 #define LSPO_KEY KC_8
 #define RSPC_KEY KC_9
