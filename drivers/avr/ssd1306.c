@@ -14,6 +14,8 @@
 #include "sendchar.h"
 #include "timer.h"
 
+#define I2C_TIMEOUT 100
+
 // Set this to 1 to help diagnose early startup problems
 // when testing power-on with ble.  Turn it off otherwise,
 // as the latency of printing most of the debug info messes
@@ -32,48 +34,19 @@ static uint16_t last_flush;
 // Write command sequence.
 // Returns true on success.
 static inline bool _send_cmd1(uint8_t cmd) {
-  bool res = false;
-
-  if (i2c_start(SSD1306_ADDRESS)) {
-    xprintf("failed to start write to %d\n", SSD1306_ADDRESS);
-    goto done;
-  }
-
-  if (i2c_write(0x0 /* command byte follows */)) {
-    print("failed to write control byte\n");
-
-    goto done;
-  }
-
-  if (i2c_write(cmd)) {
-    xprintf("failed to write command %d\n", cmd);
-    goto done;
-  }
-  res = true;
-done:
-  i2c_stop();
-  return res;
+  return (i2c_writeReg(SSD1306_ADDRESS, 0, &cmd, 1, I2C_TIMEOUT) == I2C_STATUS_SUCCESS);
 }
 
 // Write 2-byte command sequence.
 // Returns true on success
 static inline bool _send_cmd2(uint8_t cmd, uint8_t opr) {
-  if (!_send_cmd1(cmd)) {
-    return false;
-  }
-  return _send_cmd1(opr);
+  return (_send_cmd1(cmd) && _send_cmd1(opr));
 }
 
 // Write 3-byte command sequence.
 // Returns true on success
 static inline bool _send_cmd3(uint8_t cmd, uint8_t opr1, uint8_t opr2) {
-  if (!_send_cmd1(cmd)) {
-    return false;
-  }
-  if (!_send_cmd1(opr1)) {
-    return false;
-  }
-  return _send_cmd1(opr2);
+  return (_send_cmd1(cmd) && _send_cmd1(opr1) && _send_cmd1(opr2));
 }
 
 #define send_cmd1(c) if (!_send_cmd1(c)) {goto done;}
@@ -95,10 +68,8 @@ static void clear_display(void) {
     // Data mode
     goto done;
   }
-  for (uint8_t row = 0; row < MatrixRows; ++row) {
-    for (uint8_t col = 0; col < DisplayWidth; ++col) {
-      i2c_write(0);
-    }
+  for (int i = 0; i < (MatrixRows * DisplayWidth); i++) {
+    i2c_write(0);
   }
 
   display.dirty = false;
@@ -144,7 +115,7 @@ bool iota_gfx_init(void) {
   send_cmd1(SegRemap | 0x1);
   send_cmd1(ComScanDec);
 #endif
-  
+
   send_cmd2(SetComPins, 0x2);
   send_cmd2(SetContrast, 0x8f);
   send_cmd2(SetPreCharge, 0xf1);
@@ -178,7 +149,7 @@ bool iota_gfx_off(void) {
 
 done:
   return success;
-} 
+}
 
 bool iota_gfx_on(void) {
   bool success = false;
