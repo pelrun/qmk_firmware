@@ -18,6 +18,8 @@
 #include "ch.h"
 #include "hal.h"
 
+#include "report.h"
+
 #include "usb_main.h"
 
 #include "host.h"

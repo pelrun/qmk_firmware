@@ -5,6 +5,8 @@
 #include "matrix.h"
 #include "quantum.h"
 
+#include "transport.h"
+
 #define ROWS_PER_HAND (MATRIX_ROWS / 2)
 
 #ifdef RGBLIGHT_ENABLE

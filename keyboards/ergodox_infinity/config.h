@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DEBOUNCE    5
 
 #define SERIAL_LINK_BAUD 562500
+#define SERIAL_LINK_PORT SD1
 #define SERIAL_LINK_THREAD_PRIORITY (NORMALPRIO - 1)
 
 #define VISUALIZER_USER_DATA_SIZE 16

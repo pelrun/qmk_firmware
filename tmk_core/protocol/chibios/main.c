@@ -18,12 +18,14 @@
 #include "ch.h"
 #include "hal.h"
 
+#include "report.h"
+
 #include "usb_main.h"
 
 /* TMK includes */
-#include "report.h"
 #include "host.h"
 #include "host_driver.h"
+#include "null_driver.h"
 #include "keyboard.h"
 #include "action.h"
 #include "action_util.h"
@@ -54,13 +56,6 @@
  *   TMK host driver defs
  * -------------------------
  */
-
-/* declarations */
-uint8_t keyboard_leds(void);
-void send_keyboard(report_keyboard_t *report);
-void send_mouse(report_mouse_t *report);
-void send_system(uint16_t data);
-void send_consumer(uint16_t data);
 
 /* host struct */
 host_driver_t chibios_driver = {
@@ -139,38 +134,34 @@ int main(void) {
   visualizer_init();
 #endif
 
+  host_driver_t* driver = &chibios_driver;
 
-  host_driver_t* driver = NULL;
-
-  /* Wait until the USB or serial link is active */
-  while (true) {
+  /* Wait until the USB link is active */
 #if defined(WAIT_FOR_USB) || defined(SERIAL_LINK_ENABLE)
+  while (true) {
     if(USB_DRIVER.state == USB_ACTIVE) {
       driver = &chibios_driver;
       break;
     }
-#else
-    driver = &chibios_driver;
-    break;
-#endif
-#ifdef SERIAL_LINK_ENABLE
-    if(is_serial_link_connected()) {
-      driver = get_serial_link_driver();
+#if defined(SERIAL_LINK_ENABLE)
+    else if(is_serial_link_connected()) {
+      driver = &null_driver;
       break;
     }
     serial_link_update();
 #endif
     wait_ms(50);
   }
+#endif
 
   /* Do need to wait here!
    * Otherwise the next print might start a transfer on console EP
    * before the USB is completely ready, which sometimes causes
    * HardFaults.
    */
-  wait_ms(50);
+  // wait_ms(50);
 
-  print("USB configured.\n");
+  // print("USB configured.\n");
 
   /* init TMK modules */
   keyboard_init();

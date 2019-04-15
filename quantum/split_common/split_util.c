@@ -6,6 +6,10 @@
 #include "transport.h"
 #include "quantum.h"
 
+#ifndef __AVR__
+#include "quantum/serial_link/system/serial_link.h"
+#endif
+
 #ifdef EE_HANDS
 #   include "tmk_core/common/eeprom.h"
 #   include "eeconfig.h"
@@ -48,7 +52,7 @@ bool is_keyboard_master(void)
 
   return (usbstate == MASTER);
 #else
-  return true;
+  return is_serial_link_master();
 #endif
 }
 

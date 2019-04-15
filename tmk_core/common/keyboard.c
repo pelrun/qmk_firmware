@@ -57,9 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef FAUXCLICKY_ENABLE
 #   include "fauxclicky.h"
 #endif
-#ifdef SERIAL_LINK_ENABLE
-#   include "serial_link/system/serial_link.h"
-#endif
 #ifdef VISUALIZER_ENABLE
 #   include "visualizer/visualizer.h"
 #endif
@@ -340,10 +337,6 @@ MATRIX_LOOP_END:
 
 #ifdef ADB_MOUSE_ENABLE
     adb_mouse_task();
-#endif
-
-#ifdef SERIAL_LINK_ENABLE
-	serial_link_update();
 #endif
 
 #ifdef VISUALIZER_ENABLE

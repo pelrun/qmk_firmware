@@ -211,12 +211,6 @@ ifeq ($(strip $(AUTO_SHIFT_ENABLE)), yes)
     endif
 endif
 
-ifeq ($(strip $(SERIAL_LINK_ENABLE)), yes)
-    SRC += $(patsubst $(QUANTUM_PATH)/%,%,$(SERIAL_SRC))
-    OPT_DEFS += $(SERIAL_DEFS)
-    VAPTH += $(SERIAL_PATH)
-endif
-
 ifneq ($(strip $(VARIABLE_TRACE)),)
     SRC += $(QUANTUM_DIR)/variable_trace.c
     OPT_DEFS += -DNUM_TRACED_VARIABLES=$(strip $(VARIABLE_TRACE))
@@ -336,12 +330,19 @@ ifeq ($(strip $(SPLIT_KEYBOARD)), yes)
 
     # Determine which (if any) transport files are required
     ifneq ($(strip $(SPLIT_TRANSPORT)), custom)
+      ifeq ($(PLATFORM),AVR)
         QUANTUM_SRC += $(QUANTUM_DIR)/split_common/transport.c
         # Functions added via QUANTUM_LIB_SRC are only included in the final binary if they're called.
         # Unused functions are pruned away, which is why we can add multiple drivers here without bloat.
         QUANTUM_LIB_SRC += $(QUANTUM_DIR)/split_common/serial.c \
                            i2c_master.c \
                            i2c_slave.c
+      else
+        QUANTUM_SRC += $(QUANTUM_DIR)/split_common/transport_arm.c
+				QUANTUM_SRC += $(patsubst $(QUANTUM_PATH)/%,%,$(SERIAL_SRC))
+				OPT_DEFS += $(SERIAL_DEFS)
+				VPATH += $(SERIAL_PATH)
+      endif
     endif
     COMMON_VPATH += $(QUANTUM_PATH)/split_common
 endif
