@@ -60,7 +60,6 @@ SLEEP_LED_ENABLE = no              # Breathing sleep LED during USB suspend
 NKRO_ENABLE = yes                  # USB Nkey Rollover
 AUDIO_ENABLE = no                  # Audio output on port C6
 NO_USB_STARTUP_CHECK = no          # Disable initialization only when usb is plugged in
-#SERIAL_LINK_ENABLE = yes
 
 RAW_ENABLE = no
 DYNAMIC_KEYMAP_ENABLE = no

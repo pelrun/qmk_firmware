@@ -14,4 +14,3 @@ COMMAND_ENABLE = yes    # Commands for debug and configuration
 NKRO_ENABLE = yes     # USB Nkey Rollover
 AUDIO_ENABLE = yes
 RGBLIGHT_ENABLE = no
-# SERIAL_LINK_ENABLE = yes

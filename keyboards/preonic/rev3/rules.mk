@@ -5,7 +5,7 @@ SRC = matrix.c
 MCU  = STM32F303
 
 # Build Options
-#   change to "no" to disable the options, or define them in the Makefile in 
+#   change to "no" to disable the options, or define them in the Makefile in
 #   the appropriate keymap folder that will get included automatically
 #
 BOOTMAGIC_ENABLE = yes      # Virtual DIP switch configuration(+1000)
@@ -28,7 +28,6 @@ SLEEP_LED_ENABLE = no    # Breathing sleep LED during USB suspend
 #SLEEP_LED_ENABLE = yes
 
 CUSTOM_MATRIX = yes # Custom matrix file
-# SERIAL_LINK_ENABLE = yes
 ENCODER_ENABLE = yes
 
 LAYOUTS = ortho_5x12

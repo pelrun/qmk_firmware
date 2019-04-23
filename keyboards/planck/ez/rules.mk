@@ -28,7 +28,6 @@ SLEEP_LED_ENABLE = no    # Breathing sleep LED during USB suspend
 #SLEEP_LED_ENABLE = yes  # Breathing sleep LED during USB suspend
 
 CUSTOM_MATRIX = no # Custom matrix file
-# SERIAL_LINK_ENABLE = yes
 ENCODER_ENABLE = yes
 RGB_MATRIX_ENABLE = IS31FL3737
 
